@@ -1,7 +1,7 @@
+# %%
 import numpy as np
 from scipy.stats import norm
 import matplotlib.pyplot as plt
-import cv2
 import os
 import keras
 from keras.models import Sequential
@@ -11,6 +11,8 @@ from keras import backend as K
 from keras.preprocessing.image import ImageDataGenerator
 from numpy import genfromtxt
 
+
+# %%
 #fname = '/Users/ckruse/Documents/GitHub/OldFaithful/Old_Faithful_Logger.tsv'
 fname = '/Users/ckruse/Documents/python/OldFaithful/Old_Faithful_Logger.tsv'
 temp = genfromtxt(fname, delimiter = '	')
@@ -18,6 +20,9 @@ time = temp[1:-1,0]
 temp = temp[1:-1,1]
 np.shape(temp)
 
+temp
+
+# %%
 #Normalize deltas between -1 and 1
 
 print(np.max(temp))
@@ -96,17 +101,17 @@ model.compile(loss=keras.losses.mean_squared_error,
 
 from keras.layers import Conv1D, Dense, MaxPooling1D, Flatten, LSTM, AveragePooling1D
 
-model = Sequential()
-#model.add(Conv1D(filters=8, kernel_size=4, activation='relu', input_shape=(np.shape(X)[1],np.shape(X)[2]), strides=3))
-#model.add(AveragePooling1D(pool_size=2))
-#model.add(Conv1D(filters=8, kernel_size=4, activation='relu', strides=3))
-#model.add(Flatten())
-model.add(LSTM(16, return_sequences=True, input_shape=(np.shape(X)[1],np.shape(X)[2]), activation='tanh'))
-model.add(LSTM(16, activation='tanh'))
-#model.add(Dense(8, activation='relu'))
-#model.add(Dropout(0.5))
-#model.add(Dense(8, activation='relu'))
-model.add(Dense(1, activation='linear'))
+# model = Sequential()
+# #model.add(Conv1D(filters=8, kernel_size=4, activation='relu', input_shape=(np.shape(X)[1],np.shape(X)[2]), strides=3))
+# #model.add(AveragePooling1D(pool_size=2))
+# #model.add(Conv1D(filters=8, kernel_size=4, activation='relu', strides=3))
+# #model.add(Flatten())
+# model.add(LSTM(16, return_sequences=True, input_shape=(np.shape(X)[1],np.shape(X)[2]), activation='tanh'))
+# model.add(LSTM(16, activation='tanh'))
+# #model.add(Dense(8, activation='relu'))
+# #model.add(Dropout(0.5))
+# #model.add(Dense(8, activation='relu'))
+# model.add(Dense(1, activation='linear'))
 
 
 model.compile(loss=keras.losses.mean_squared_error,
@@ -115,7 +120,7 @@ model.compile(loss=keras.losses.mean_squared_error,
 
 from keras.models import load_model
 
-epochs = 15
+epochs = 150
 
 #model = load_model('/Users/ckruse/Documents/python/oldFaithfulTemp.h5')
 history = model.fit(X,
@@ -124,7 +129,7 @@ history = model.fit(X,
                   validation_data = [X_val,Y_val],
                   verbose=1,
                   batch_size=256,
-                  shuffle=False)
+                  shuffle=True)
 
 model.save('/Users/ckruse/Documents/python/oldFaithfulTemp.h5')
 plt.plot(history.history['loss'])
@@ -138,16 +143,20 @@ plt.show()
 #model.save('/Users/ckruse/Documents/python/soccer/model.h5')
 
 
-testPredict = model.predict(X_val)
+scope = range(0,20000)
+plot_range = range(0,np.max(scope)-np.min(scope)+1)
+
+testPredict = model.predict(X_val[scope])
 testPredict = ((testPredict+1)/2)*196
 
 trainPredict = model.predict(X[0:150])
 trainPredict = ((trainPredict+1)/2)*196
 normY = ((Y_val+1)/2)*196
 
+
 plt.figure(figsize=(15,10))
-plt.plot(testPredict[0:500,0])
-plt.plot(normY[0:500])
+plt.plot(testPredict[plot_range,0])
+plt.scatter(plot_range,normY[scope],s=3, c=[1,0,0])
 plt.xlabel('Time Step (min)')
 plt.ylabel('Predicted time until next eruption (min)')
 plt.title('Time Until Next Old Faithful Eruption')
