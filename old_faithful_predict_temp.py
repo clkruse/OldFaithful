@@ -17,9 +17,9 @@ from numpy import genfromtxt
 # Temperature in degrees C
 # Time measured once per minute. Time in Unix seconds
 fname = '/Users/ckruse/Documents/python/OldFaithful/Old_Faithful_Logger.csv'
-temp = genfromtxt(fname, delimiter = ',')
-time = temp[1:-1,0]
-temp = temp[1:-1,1]
+data = genfromtxt(fname, delimiter = ',')
+time = data[1:-1,0]
+temp = data[1:-1,1]
 
 # Normalize temperatures between -1 and 1
 temp = temp/np.max(temp)*2 - 1

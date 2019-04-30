@@ -12,23 +12,33 @@ from keras.preprocessing.image import ImageDataGenerator
 from numpy import genfromtxt
 
 
-# %%
-#fname = '/Users/ckruse/Documents/GitHub/OldFaithful/Old_Faithful_Logger.tsv'
-fname = '/Users/ckruse/Documents/python/OldFaithful/Old_Faithful_Logger.tsv'
-temp = genfromtxt(fname, delimiter = '	')
+# Import old faithful temperature/time data
+# Dataset stretches from 4/13/2015 - 10/26/2015
+# Temperature in degrees C
+# Time measured once per minute. Time in Unix seconds
+fname = '/Users/ckruse/Documents/python/OldFaithful/Old_Faithful_Logger.csv'
+temp = genfromtxt(fname, delimiter = ',')
 time = temp[1:-1,0]
 temp = temp[1:-1,1]
-np.shape(temp)
 
-temp
-
-# %%
-#Normalize deltas between -1 and 1
-
-print(np.max(temp))
-
+# Normalize temperatures between -1 and 1
 temp = temp/np.max(temp)*2 - 1
-print(np.max(temp))
+np.shape(temp)
+print("Max Temp:", np.max(temp))
+print("Min Temp:", np.min(temp))
+plt.hist(temp,100)
+plt.title("Histogram of normalized temperatures")
+plt.show()
+
+# Plot a few snippets of data of length 2000
+for i in range(1,4):
+	plot_length = 2000
+	random_index = np.random.randint(0, len(temp) - plot_length)
+	plt.plot(temp[random_index:random_index + plot_length], linewidth = 0.5)
+	plt.title("Start Index: " + str(random_index))
+	plt.show()
+
+
 
 def create_dataset(dataset, labels, look_back):
 	dataX, dataY = [], []
@@ -55,9 +65,7 @@ for measurement in range(0, len(temp)):
         start = measurement
 
 np.argmax(timing)
-
 print(np.max(timing))
-
 
 timing = np.divide(timing,np.max(timing))*2 - 1
 print(np.max(timing))
@@ -71,6 +79,7 @@ X, Y = create_dataset(temp[0:int(len(temp)-val*len(temp))], timing[0:int(len(tim
 X_val, Y_val = create_dataset(temp[int(len(temp)-val*len(temp)):-1], timing[int(len(timing)-val*len(timing)):-1], seq_len)
 
 temp_val = temp[int(len(temp)-val*len(temp)):-1]
+
 
 print(X.shape)
 X = X.reshape(X.shape[0], X.shape[1], 1)
