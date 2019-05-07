@@ -24,8 +24,8 @@ time = to_categorical(time_to_eruption)
 
 [temp_train, time_train, temp_test, time_test] = split_train_test(temp_norm, time, 0.1)
 
-[x_train, y_train] = select_sequential_sequences(temp_train, time_train, 75)
-[x_test, y_test] = select_sequential_sequences(temp_test, time_test, 75)
+[x_train, y_train] = select_sequential_sequences(temp_train, time_train, 250)
+[x_test, y_test] = select_sequential_sequences(temp_test, time_test, 250)
 
 
 
@@ -34,7 +34,31 @@ time = to_categorical(time_to_eruption)
 
 model = define_model(x_train, y_train)
 
-[model, history, params] = train_model(model, 10, x_train, y_train, x_test, y_test)
+[model, history, params] = train_model(model, 50, x_train, y_train, x_test, y_test)
+
+prediction_overlay(x_test, y_test, model, 200)
+
+convs = model.get_weights()[0]
+
+for i in range(15):
+	plt.plot(convs[:,0,i])
+	plt.title("Convolution #" + str(i))
+	plt.show()
+
+stride = 1
+conv_size = convs.shape[0]
+num_convs = convs.shape[2]
+
+for layer in range(num_convs):
+	convolved = []
+	for i in range(0,len(x_test[0,:,0])-conv_size, stride):
+		convolution = np.dot(convs[:, 0, layer], x_test[1800,i:i+conv_size,0])
+		convolved = np.append(convolved, convolution)
+	plt.plot(range(conv_size - 1, len(x_test[1800,:,0]) - 1), convolved)
+	plt.plot(x_test[1800,:,0], c='r')
+	plt.title("Convolution #" + str(layer))
+	plt.show()
+
 
 
 # Normalize Data
@@ -168,13 +192,25 @@ def clipped_mse(y_true, y_pred):
 def define_model(input_x, input_y):
 
 	model = Sequential()
-	model.add(Conv1D(filters=8, kernel_size=8, activation='relu', input_shape=(np.shape(input_x)[1],np.shape(input_x)[2]), strides=4))
-	model.add(MaxPooling1D(pool_size=2))
-	#model.add(Dense(32, activation='relu', input_shape=(x_train.shape[1],x_train.shape[2])))
+	model.add(Conv1D(filters=16,
+					kernel_size=16,
+					activation='relu',
+					strides=1,
+					padding='valid', input_shape=(np.shape(input_x)[1],np.shape(input_x)[2])))
+	#model.add(MaxPooling1D(pool_size=2))
+	#model.add(Conv1D(filters=16, kernel_size=4, activation='relu', strides=4))
+	#model.add(MaxPooling1D(pool_size=2))
+	#model.add(Dense(16, activation='relu',input_shape=(np.shape(input_x)[1],np.shape(input_x)[2])))
+	model.add(Conv1D(filters=32,
+					kernel_size=16,
+					activation='relu',
+					strides=1,
+					padding='valid'))
 	model.add(Flatten())
 	model.add(Dense(32, activation='relu'))
-	model.add(Dropout(0.1))
-	model.add(Dense(32, activation='relu'))
+	model.add(Dense(16, activation='relu'))
+	model.add(Dense(16, activation='relu'))
+	model.add(Dense(16, activation='relu'))
 	model.add(Dense(y_train.shape[1], activation='softmax'))
 	model.compile(loss=keras.losses.categorical_crossentropy,
 				  optimizer=keras.optimizers.adam(),
@@ -259,10 +295,13 @@ def prediction_overlay(x_test, y_test, model, evaluation_len):
 
 	deltas = np.zeros(len(preds))
 	pred_max = np.zeros(len(preds))
+	pred_std = np.zeros(len(preds))
 	label_max = np.zeros(len(preds))
 
 	for i in range(len(preds)):
-		pred_max[i] = np.argmax(preds[i])
+		#pred_max[i] = np.argmax(preds[i])
+		pred_max[i] = np.sum(preds[i] * range(174))
+		pred_std[i] = np.std(preds[i][preds[i] > 0]) * preds.shape[1]
 		label_max[i] = np.argmax(y_test[i])
 		diff = pred_max[i] - label_max[i]
 		deltas[i] = diff
@@ -270,13 +309,16 @@ def prediction_overlay(x_test, y_test, model, evaluation_len):
 	random_index = np.random.randint(0, len(x_test) - evaluation_len)
 
 	plt.plot(label_max[random_index:random_index + evaluation_len])
-	plt.plot(deltas[random_index:random_index + evaluation_len], c='grey')
-	plt.plot(pred_max[random_index:random_index + evaluation_len], c='r')
-	plt.legend(["Labels", "Predictions", "Delta"])
+	#plt.plot(deltas[random_index:random_index + evaluation_len], c='grey')
+	plt.errorbar(range(evaluation_len), pred_max[random_index:random_index + evaluation_len], pred_std[random_index:random_index + evaluation_len], elinewidth = 0.5, capsize=0, c = 'r', ecolor = 'grey')
+	#plt.plot(pred_max[random_index:random_index + evaluation_len], c='r')
+	#plt.legend(["Delta", "Labels", "Predictions"])
+	plt.legend(["Labels", "Predictions"])
+	plt.ylim([-20, 100])
 	plt.grid()
 	plt.show()
 
-prediction_overlay(x_test, y_test, model, 500)
+
 
 for i in range(1500, 1600):
 	plt.plot(preds[i], linewidth=0.5)
@@ -288,16 +330,21 @@ for i in range(1500, 1600):
 
 deltas = np.zeros(len(preds))
 pred_max = np.zeros(len(preds))
+pred_std = np.zeros(len(preds))
 label_max = np.zeros(len(preds))
 
 for i in range(len(preds)):
 	pred_max[i] = np.argmax(preds[i])
+	pred_std[i] = np.std(preds[i]) * preds.shape[1]
 	label_max[i] = np.argmax(y_test[i])
 	diff = pred_max[i] - label_max[i]
 	deltas[i] = diff
 
+plt.errorbar(range(100), pred_max[0:100], pred_std[0:100], elinewidth = 0.5, capsize=0, ecolor = 'grey')
+plt.show()
 
-
+np.sum(preds[30] * range(174))
+np.argmax(preds[30])
 random_index = np.random.randint(0, len(predictions) - evaluation_len)
 
 plt.plot(label_max[0:500])
@@ -310,3 +357,10 @@ plt.show()
 np.argmax(y_test[0:30])
 
 plt.plot(preds[30])
+preds = model.predict(x_test)
+preds[1]
+np.std(preds[10][preds[10] > 0.02]) * preds.shape[1]
+plt.plot(preds[0])
+plt.show()
+
+plt.plot(preds[10][preds[10] > 0.02])
