@@ -25,7 +25,7 @@ time_to_eruption = create_erupt_countdown(temp, 2.0)
 variable = []
 train_losses = []
 test_losses = []
-for var in range(25, 1000, 75):
+for var in range(25, 775, 75):
 	print("seq_len:", var)
 	[x_train, y_train] = select_sequential_sequences(temp_train, time_train, var)
 	[x_test, y_test] = select_sequential_sequences(temp_test, time_test, var)
@@ -35,18 +35,22 @@ for var in range(25, 1000, 75):
 
 	model = define_model(x_train, y_train, 1)
 
-	[model, history, params] = train_model(model, 10, x_train, y_train, x_test, y_test)
-	variable.append(num_fc)
+	[model, history, params] = train_model(model, 3, x_train, y_train, x_test, y_test)
+	variable.append(var)
 	train_losses.append(history['loss'][-1])
 	test_losses.append(history['val_loss'][-1])
 	prediction_overlay(x_test, y_test, model, time_scale, 500, var)
-	visualize_network(model, x_test, y_test, var, temp_scale, time_scale, "Number of FC " + str(num_fc))
+	visualize_network(model, x_test, y_test, var, temp_scale, time_scale, "Sequence Length " + str(var))
 	plt.plot(variable, train_losses)
 	plt.plot(variable, test_losses, c='r')
 	plt.show()
 
-plt.plot(convs, train_losses)
-plt.plot(convs, test_losses)
+plt.plot(variable, train_losses)
+plt.plot(variable, test_losses, c='r')
+plt.title("Input Sequence Length vs. Loss")
+plt.xlabel("Sequence Length")
+plt.ylabel("Model Loss Value")
+plt.legend(["Train Loss", "Test Loss"])
 plt.show()
 
 visualize_network(model, x_test, y_test, seq_len, temp_scale, time_scale, )
@@ -223,7 +227,7 @@ def train_model(model, epochs, x_train, y_train, x_test, y_test):
 	                  batch_size=256,
 	                  shuffle=True)
 
-	#model.save('old_faithful_time.h5')
+	model.save('old_faithful_time.h5')
 	plt.plot(history.history['loss'])
 	plt.plot(history.history['val_loss'], c='r')
 	plt.legend(["Train Loss", "Test Loss"])
@@ -333,7 +337,14 @@ plt.legend(["Train Losses", "Test Losses"])
 plt.grid()
 plt.title("Losses vs. Input Sequence Length")
 plt.xlabel("Sequence Length")
-plt.figtext(0.5, -0.1, "Arch: 8c8-stride1-relu+mp2+2(32n-relu)+drop0.1+32n-relu+1n-linear\n10 epochs with a batch size of 256", horizontalalignment='center', verticalalignment='bottom', fontstyle='italic')
+plt.figtext(0.5, -0.1, "Arch: 8c8-stride1-relu+mp2+2(32n-relu)+drop0.1+32n-relu+1n-linear.\n3 epochs with a batch size of 256", horizontalalignment='center', verticalalignment='bottom', fontstyle='italic')
 plt.ylabel("Loss Value (MSE)")
 plt.savefig("Loss vs. Sequence Length.png", dpi=300, bbox_inches='tight', pad_inches=0.1)
+plt.show()
+
+plt.plot(temp[100500:101500])
+plt.title("Geyser Mouth Temperature")
+plt.xlabel("Elapsed Time (min)")
+plt.ylabel("Temperature (°C)")
+plt.savefig("Temperature over Time.png", dpi=300, bbox_inches='tight', pad_inches=0.1)
 plt.show()
