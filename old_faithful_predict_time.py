@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib import animation, rc
+from matplotlib import animation, rc, cm
 from IPython.display import HTML
 import os
 import sys
@@ -8,13 +8,14 @@ import keras
 from keras.models import Sequential, load_model
 from keras.layers import Dense, Dropout, Flatten, Reshape, Conv1D, MaxPooling1D
 from keras import backend as K
+import joypy
 
-
+#data from https://geysertimes.org/datalogger/archive.php
 [time, temp] = import_data('Old_Faithful_Logger.csv')
-
+np.shape(time)
 #animated_plot(temp, 1000, 65, 500, 30)
 
-time_to_eruption = create_erupt_countdown(temp, 2.0)
+time_to_eruption = create_erupt_countdown(temp, 4.0)
 
 [temp_norm, temp_scale] = normalize_data(temp)
 
@@ -25,7 +26,7 @@ time_to_eruption = create_erupt_countdown(temp, 2.0)
 variable = []
 train_losses = []
 test_losses = []
-for var in range(25, 775, 75):
+for var in range(200, 201, 75):
 	print("seq_len:", var)
 	[x_train, y_train] = select_sequential_sequences(temp_train, time_train, var)
 	[x_test, y_test] = select_sequential_sequences(temp_test, time_test, var)
@@ -35,7 +36,7 @@ for var in range(25, 775, 75):
 
 	model = define_model(x_train, y_train, 1)
 
-	[model, history, params] = train_model(model, 3, x_train, y_train, x_test, y_test)
+	[model, history, params] = train_model(model, 5, x_train, y_train, x_test, y_test)
 	variable.append(var)
 	train_losses.append(history['loss'][-1])
 	test_losses.append(history['val_loss'][-1])
@@ -53,21 +54,54 @@ plt.ylabel("Model Loss Value")
 plt.legend(["Train Loss", "Test Loss"])
 plt.show()
 
-visualize_network(model, x_test, y_test, seq_len, temp_scale, time_scale, )
+
+np.max(labels)
+
+preds, labels = prediction_overlay(x_test, y_test, model, time_scale, 26800, 200)
+
+interval = 10
+for time_val in range(0,int(np.max(labels)-interval), interval):
+    indexes = np.where((labels >= time_val) & (labels  < time_val + interval))
+    error = preds[indexes] - labels[indexes]
+    plt.hist(error,100, density=True)
+    plt.xlim([-80, 80])
+    plt.grid()
+    plt.axvline(np.mean(error), c='r', linewidth=1)
+    plt.title("Error for times to eruption between " + str(time_val) + " and " + str(time_val + interval))
+    plt.show()
 
 
-prediction_overlay(x_test, y_test, model, time_scale, 180, 1500)
+x = np.arange(0,100,0.1)
+y =[n*x for n in range(1,4)]
+np.shape(y)
+
+
+create_joyplot(preds, labels, 2)
+
+
+
+
+plt.plot(preds[1000:3000]-labels[1000:3000]);plt.grid();plt.ylim([-20, 20]);plt.show()
+
+preds_train, labels_train = prediction_overlay(x_train, y_train, model, time_scale, 241117, 200)
+
+plt.hist(preds-labels,151);plt.xlim([-25, 25]);plt.grid();plt.title("Error Distribution in the Test Dataset");plt.show()
+plt.hist(preds_train-labels_train,151);plt.xlim([-25, 25]);plt.grid();plt.title("Error Distribution in the Train Dataset");plt.show()
+
+plt.scatter(labels_train,preds_train-labels_train, s=0.1, alpha=0.1);plt.ylabel("error"),plt.xlabel("Correct Value");plt.show()
+
 visualize_network(model, x_test, y_test, 1500, temp_scale, time_scale, "Test")
 
 visualize_network(model, x_train, y_train, 50, temp_scale, time_scale, "Test")
 
 
 
-for i in range(4):
+for i in range(10):
 	plot_length = 1000
 	random_index = np.random.randint(0, len(temp_test) - plot_length)
-	plt.plot(temp_test[random_index:random_index + plot_length], linewidth = 1)
-	plt.plot(time_test[random_index:random_index + plot_length], linewidth = 1)
+	plt.plot(temp_test[random_index:random_index + plot_length]-0.2, linewidth = 1)
+	plt.plot(time_test[random_index:random_index + plot_length], linewidth = 1, c='r')
+	plt.legend(['Input (x): Temperature', 'Output (y): Time to next eruption'])
 	plt.title("Start Index: " + str(random_index))
 	plt.show()
 
@@ -212,7 +246,7 @@ def define_model(input_x, input_y, var):
 	model.add(Dropout(0.1))
 	model.add(Dense(32, activation='relu'))
 	model.add(Dense(1, activation='linear'))
-	model.compile(loss=keras.losses.mean_squared_error,
+	model.compile(loss=keras.losses.mean_absolute_error,
 				  optimizer=keras.optimizers.adam(),
 				  metrics=['mae'])
 	return model
@@ -311,7 +345,43 @@ def prediction_overlay(x_test, y_test, model, time_scale, evaluation_len, sequen
 	plt.legend(["Predictions", "Labels"])
 	plt.title("Start Index: " + str(random_index))
 	plt.show()
+	return preds[:,0], labels
 
+def create_joyplot(preds, labels, interval):
+    interval = interval
+    errors = []
+    timespan = []
+    error_colors = []
+    for time_val in range(0,int(np.max(labels)-interval), interval):
+        indexes = np.where((labels >= time_val) & (labels  < time_val + interval))
+        error = preds[indexes] - labels[indexes]
+        errors.append(error)
+        error_colors.append(np.median(error))
+        if time_val % 12 == 0:
+            timespan.append(str(time_val) + " min")
+        else: timespan.append(None)
+
+
+    orig_cmap = cm.RdYlBu
+    # Create a normalization scheme so that colorbar has correct legend
+    norm = plt.Normalize(np.min(error_colors), np.max(error_colors))
+    # Create a colormap based on avg error at each interval
+    error_cmap = ListedColormap(orig_cmap(norm(error_colors)))
+    # Create a color bar
+    sm = cm.ScalarMappable(cmap=orig_cmap, norm=norm)
+    sm.set_array([])
+
+    fig, axes = joypy.joyplot(errors, labels=timespan, x_range=[-30, 15], overlap=1, figsize=(6,5), colormap=error_cmap, title="Distribution of Error Grouped by Time to Eruption", fade=False, linewidth=0.5,range_style='all', grid='x')
+    fig.colorbar(sm, ax=axes, label="Median Error (minutes)")
+    plt.xlabel("Error (min)")
+    ax = axes[-1]
+    ax.yaxis.set_label_position("left")
+    ax.set_ylabel("Time until next eruption (min)")
+    ax.yaxis.set_label_coords(-0.18,0.5)
+    ax.yaxis.set_ticks([])
+    ax.yaxis.set_visible(True)
+    plt.show()
+    fig.savefig("Distribution of Error by Time to Eruption.png", dpi=300, bbox_inches='tight', pad_inches=0.1)
 
 
 train_losses = np.array([0.0030, 0.0027, 0.0026, 0.0026, 0.0027, 0.0026, 0.0025, 0.0026, 0.0025, 0.0025, 0.0028, 0.0026, 0.0025, 0.0024, 0.0026, 0.0026, 0.0026, 0.0025, 0.0026])
@@ -342,9 +412,74 @@ plt.ylabel("Loss Value (MSE)")
 plt.savefig("Loss vs. Sequence Length.png", dpi=300, bbox_inches='tight', pad_inches=0.1)
 plt.show()
 
-plt.plot(temp[100500:101500])
-plt.title("Geyser Mouth Temperature")
+
+plt.plot(time_to_eruption[1350:1850])
+plt.title("Time until Next Eruption")
+plt.grid(linewidth=0.2)
 plt.xlabel("Elapsed Time (min)")
-plt.ylabel("Temperature (°C)")
-plt.savefig("Temperature over Time.png", dpi=300, bbox_inches='tight', pad_inches=0.1)
+plt.ylabel("Time until Eruption (min)")
+plt.rc('axes', linewidth=0.5)
+plt.figtext(0.5, -0.05, "Data from geysertimes.org", horizontalalignment='center', verticalalignment='bottom', fontstyle='italic')
+plt.savefig("Time until Next Eruption.png", dpi=300, bbox_inches='tight', pad_inches=0.1)
 plt.show()
+
+
+
+
+
+interval = np.genfromtxt("old_faithful_interval.csv", delimiter = ',')
+np.size(interval)
+train = interval[0 : -1 - int(0.1 * np.size(interval))]
+test = interval[np.size(interval) - int(0.1 * np.size(interval)) : -1]
+
+seq_len = 15
+[x_train, y_train] = select_sequential_sequences(train, train, seq_len)
+[x_test, y_test] = select_sequential_sequences(test, test, seq_len)
+
+model = define_model(x_train, y_train, 1)
+
+[model, history, params] = train_model(model, 100, x_train, y_train, x_test, y_test)
+
+np.shape(y_test)
+preds, labels = prediction_overlay(x_train, y_train, model, 1, 50000, 200)
+
+plt.plot(preds,linewidth=0.5)
+plt.plot(labels-10, c='r',linewidth=0.5)
+plt.show()
+
+diff = []
+for i in range(800,1100):
+    diff = np.append(diff, np.median(i/100+preds-labels))
+
+plt.plot(diff)
+plt.grid()
+plt.hist(9.2+preds-labels, 100)
+plt.show()
+
+plt.scatter(9.2+preds, labels, s=0.2, alpha=0.1)
+plt.plot(range(40,250),range(40,250), c='r')
+plt.xlim([80, 100])
+plt.ylim([80, 100])
+plt.xlabel("Predictions")
+plt.ylabel("Labels")
+plt.show()
+
+a = plt.hist(interval,250, alpha = 0.5)
+counts = a[0]
+bins = a[1]
+bins = bins[0:-1]
+plt.plot(bins+0.5, counts, c='r')
+plt.xlabel("Time Between Eruptions (min)")
+plt.ylabel("Number of Eruptions")
+plt.title("Distribution of Old Faithful Eruption Times")
+plt.xlim([45, 135])
+plt.figtext(0.5, -0.1, "Note the bimodal peaks centered at 65 min and 92 min\nEruptions between 2000 and 2011. Data from geyserstudy.org", horizontalalignment='center', verticalalignment='bottom', fontstyle='italic')
+plt.rc('axes', linewidth=0.5)
+plt.axvline(np.mean(interval[interval > 75]), c='gray', linewidth=0.5)
+plt.axvline(np.mean(interval[interval < 75]), c='gray', linewidth=0.5)
+plt.savefig("Distribution of Eruption Times.png", dpi=300, bbox_inches='tight', pad_inches=0.1)
+plt.show()
+
+
+np.mean(interval[interval < 75])
+time[-1]
